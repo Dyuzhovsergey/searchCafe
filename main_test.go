@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	//"golang.org/x/text/search"
 )
 
 func TestCafeWhenOk(t *testing.T) {
@@ -29,7 +30,7 @@ func TestCafeWhenOk(t *testing.T) {
 	}
 }
 
-func TestCafeWhenBad(t *testing.T) {
+func TestCafeNegative(t *testing.T) {
 	handler := http.HandlerFunc(mainHandle)
 
 	type requestTest struct {
@@ -49,7 +50,9 @@ func TestCafeWhenBad(t *testing.T) {
 
 		handler.ServeHTTP(response, req)
 		assert.Equal(t, v.status, response.Code)
-		assert.Equal(t, v.message, strings.TrimSpace(response.Body.String()))
+
+		resResp := strings.TrimSpace(response.Body.String())
+		assert.Equal(t, v.message, resResp, fmt.Sprintf("unexpected message='%s'", v.message))
 	}
 }
 
@@ -57,28 +60,64 @@ func TestCafeCount(t *testing.T) {
 	handler := http.HandlerFunc(mainHandle)
 
 	requests := []struct {
-		count int // передаваемое значение count
-		want  int // ожидаемое количество кафе в ответе
+		count int
+		want  int
 	}{
-		{0, 0},
-		{1, 1},
-		{2, 2},
-		{100, len(cafeList["moscow"])},
+		{count: 0, want: 0},
+		{count: 1, want: 1},
+		{count: 2, want: 2},
+		{count: 100, want: len(cafeList["moscow"])},
 	}
 	for _, tc := range requests {
 		url := fmt.Sprintf("/cafe?city=moscow&count=%d", tc.count)
 		response := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", url, nil)
-
 		handler.ServeHTTP(response, req)
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		result := strings.Split(response.Body.String(), ",")
 		if tc.want == 0 && len(result[0]) == 0 {
-			result = []string{} // если вернулась пустая строка — это 0 записей
+			result = []string{}
 		}
 		assert.Equal(t, tc.want, len(result), fmt.Sprintf("unexpected cafe count. Count=%d", tc.count))
+	}
+}
+
+func TestCafeSearch(t *testing.T) {
+	handler := http.HandlerFunc(mainHandle)
+
+	requests := []struct {
+		search    string
+		wantCount int
+	}{
+		{search: "фасоль", wantCount: 0},
+		{search: "кофе", wantCount: 2},
+		{search: "вилка", wantCount: 1},
+	}
+
+	for _, tc := range requests {
+		url := fmt.Sprintf("/cafe?city=moscow&search=%s", tc.search)
+
+		response := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", url, nil)
+		handler.ServeHTTP(response, req)
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		result := strings.Split(response.Body.String(), ",")
+		if tc.wantCount == 0 && len(result[0]) == 0 {
+			result = []string{}
+		}
+
+		assert.Equal(t, tc.wantCount, len(result), fmt.Sprintf("unexpected count cafe for query='%s'", tc.search))
+
+		for _, cafe := range result {
+			ok := strings.Contains(strings.ToLower(cafe), strings.ToLower(tc.search))
+			assert.True(t, ok, fmt.Sprintf("cafe name %s does not contain search query %s", cafe, tc.search))
+
+		}
+
 	}
 
 }
