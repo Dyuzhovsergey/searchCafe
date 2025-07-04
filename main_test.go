@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	//"golang.org/x/text/search"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCafeWhenOk(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCafeCount(t *testing.T) {
 		{count: 0, want: 0},
 		{count: 1, want: 1},
 		{count: 2, want: 2},
-		{count: 100, want: len(cafeList["moscow"])},
+		{count: 100, want: min(100, len(cafeList["moscow"]))},
 	}
 	for _, tc := range requests {
 		url := fmt.Sprintf("/cafe?city=moscow&count=%d", tc.count)
@@ -74,13 +74,13 @@ func TestCafeCount(t *testing.T) {
 		req := httptest.NewRequest("GET", url, nil)
 		handler.ServeHTTP(response, req)
 
-		assert.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, http.StatusOK, response.Code)
 
 		result := strings.Split(response.Body.String(), ",")
 		if tc.want == 0 && len(result[0]) == 0 {
 			result = []string{}
 		}
-		assert.Equal(t, tc.want, len(result), fmt.Sprintf("unexpected cafe count. Count=%d", tc.count))
+		assert.Len(t, result, tc.want, fmt.Sprintf("unexpected cafe count. Count=%d", tc.count))
 	}
 }
 
@@ -103,21 +103,21 @@ func TestCafeSearch(t *testing.T) {
 		req := httptest.NewRequest("GET", url, nil)
 		handler.ServeHTTP(response, req)
 
-		assert.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, http.StatusOK, response.Code)
 
 		result := strings.Split(response.Body.String(), ",")
 		if tc.wantCount == 0 && len(result[0]) == 0 {
 			result = []string{}
 		}
-
-		assert.Equal(t, tc.wantCount, len(result), fmt.Sprintf("unexpected count cafe for query='%s'", tc.search))
+		assert.Len(t, result, tc.wantCount, fmt.Sprintf("unexpected count cafe for query='%s'", tc.search))
 
 		for _, cafe := range result {
-			ok := strings.Contains(strings.ToLower(cafe), strings.ToLower(tc.search))
-			assert.True(t, ok, fmt.Sprintf("cafe name %s does not contain search query %s", cafe, tc.search))
-
+			assert.Contains(
+				t,
+				strings.ToLower(cafe),
+				strings.ToLower(tc.search),
+				fmt.Sprintf("cafe name %s does not contain search query %s", cafe, tc.search))
 		}
 
 	}
-
 }
